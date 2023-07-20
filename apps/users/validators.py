@@ -1,41 +1,58 @@
-from rest_framework import serializers
-from django.contrib import auth
-from rest_framework.exceptions import AuthenticationFailed
+from django.contrib.auth import authenticate, get_user_model
+from django.core.exceptions import ValidationError
 
-from .models import User
-
-
-def validate_registration(attrs):
-    email = attrs.get("email", "")
-    username = attrs.get("username", "")
-    if not username.isalnum():
-        raise serializers.ValidationError(
-            "The username should only contain alphanumeric characters"
-        )
-
-    if User.objects.filter(username=username).exists():
-        raise serializers.ValidationError("The username is already taken")
-
-    if User.objects.filter(email=email).exists():
-        raise serializers.ValidationError("The email is already taken")
-
-    if len(attrs.get("password", "")) < 6:
-        raise serializers.ValidationError(
-            "The password should be at least 6 characters long"
-        )
-
-    if attrs.get("password", "") != attrs.get("confirm_password", ""):
-        raise serializers.ValidationError("The passwords do not match")
-
-    return attrs
+User = get_user_model()
 
 
-def validate_login(attrs):
-    username = attrs.get("username", "")
-    password = attrs.get("password", "")
-    user = auth.authenticate(username=username, password=password)
-    if not user:
-        raise AuthenticationFailed("Invalid credentials, try again")
-    if not user.is_active:
-        raise AuthenticationFailed("Account disabled, contact admin")
-    return {"email": user.email, "username": user.username, "tokens": user.tokens}
+class BaseValidator:
+    """
+    Base class for all validators
+    """
+
+    def __init__(self, attrs: dict):
+        self.errors = {}
+        self.attrs = attrs
+
+    def add_error(self, name, value):
+        self.errors[name] = value
+
+    def validate(self):
+        raise NotImplementedError
+
+    def is_valid(self):
+        if self.errors:
+            raise ValidationError(self.errors)
+        return self.attrs
+
+
+class RegisterValidator(BaseValidator):
+    def validate_username(self):
+        if User.objects.filter(username=self.attrs.get("username")).exists():
+            self.add_error("username", "This username already exists")
+
+    def validate_email(self):
+        if User.objects.filter(email=self.attrs.get("email")).exists():
+            self.add_error("email", "This email already exists")
+
+    def validate(self):
+        self.validate_username()
+        self.validate_email()
+        return self.is_valid()
+
+
+class LoginValidator(BaseValidator):
+    def validate_username(self):
+        if not User.objects.filter(username=self.attrs.get("username")).exists():
+            self.add_error("username", "Username doesn't exists")
+
+    def validate_auth(self):
+        username = self.attrs.get("username")
+        password = self.attrs.get("password")
+        user = User.objects.get(username=username)
+        if not user.check_password(password):
+            self.add_error("password", "Wrong password, try again")
+
+    def validate(self):
+        self.validate_username()
+        self.validate_auth()
+        return self.is_valid()

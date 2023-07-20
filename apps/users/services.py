@@ -1,5 +1,6 @@
-from .models import User
 from django.db import IntegrityError
+
+from .models import User
 
 
 def create_user(validated_data):
@@ -7,7 +8,9 @@ def create_user(validated_data):
     Creates a new user with the provided information.
     """
     try:
-        return User.objects.create_user(**validated_data)
+        user = User.objects.create_user(**validated_data)
+        user.set_password(validated_data.get("password"))
+        return user
     except IntegrityError:
         raise ValueError("User creation failed: Integrity error")
     except Exception as e:

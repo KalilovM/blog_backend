@@ -1,31 +1,32 @@
 from rest_framework import serializers
-from .validators import validate_registration, validate_login
-from .services import create_user, get_user
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
 from .models import User
+from .services import create_user, get_user
+from .validators import LoginValidator, RegisterValidator
 
 
-class RegisterSerializer(serializers.ModelSerializer):
+class RegisterSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=60)
+    email = serializers.EmailField(max_length=50)
     password = serializers.CharField(max_length=68, min_length=6, write_only=True)
-    confirm_password = serializers.CharField(
-        max_length=68, min_length=6, write_only=True
-    )
+    tokens = serializers.SerializerMethodField()
 
-    class Meta:
-        model = User
-        fields = ["email", "username", "password"]
+    def get_tokens(self, obj: User):
+        user: User = get_user(username=obj.username)
+        return {"refresh": user.tokens()["refresh"], "access": user.tokens()["access"]}
 
     def validate(self, attrs):
-        return validate_registration(attrs)
+        validator = RegisterValidator(attrs)
+        return validator.validate()
 
     def create(self, validated_data):
         return create_user(validated_data)
 
 
 class LoginSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(max_length=68, min_length=6, write_only=True)
+    password = serializers.CharField(write_only=True)
     username = serializers.CharField(max_length=50, min_length=3)
     tokens = serializers.SerializerMethodField()
 
@@ -38,7 +39,8 @@ class LoginSerializer(serializers.ModelSerializer):
         fields = ["password", "username", "tokens"]
 
     def validate(self, attrs):
-        return validate_login(attrs)
+        validator = LoginValidator(attrs)
+        return validator.validate()
 
 
 class LogoutSerializer(serializers.ModelSerializer):

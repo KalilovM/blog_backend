@@ -1,11 +1,16 @@
+import logging
+
 from rest_framework import generics, status
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from apps.users.serializers import RegisterSerializer, LoginSerializer, LogoutSerializer
+
+from apps.users.serializers import (LoginSerializer, LogoutSerializer,
+                                    RegisterSerializer)
 
 
 class RegisterAPIView(generics.GenericAPIView):
     serializer_class = RegisterSerializer
+    permission_classes = (AllowAny,)
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
@@ -17,11 +22,11 @@ class RegisterAPIView(generics.GenericAPIView):
 
 class LoginAPIView(generics.GenericAPIView):
     serializer_class = LoginSerializer
+    permission_classes = (AllowAny,)
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
