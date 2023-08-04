@@ -42,15 +42,19 @@ class RegisterValidator(BaseValidator):
 
 class LoginValidator(BaseValidator):
     def validate_username(self):
-        if not User.objects.filter(username=self.attrs.get("username")).exists():
+        user = User.objects.filter(username=self.attrs.get("username"))
+        if not user.exists():
             self.add_error("username", "Username doesn't exists")
 
     def validate_auth(self):
         username = self.attrs.get("username")
         password = self.attrs.get("password")
-        user = User.objects.get(username=username)
-        if not user.check_password(password):
-            self.add_error("password", "Wrong password, try again")
+        try:
+            user = User.objects.get(username=username)
+            if not user.check_password(password):
+                self.add_error("password", "Wrong password, try again")
+        except User.DoesNotExist:
+            self.add_error("username", "Username doesn't exists")
 
     def validate(self):
         self.validate_username()
